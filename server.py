@@ -11,6 +11,7 @@ Ctrl+C) for a clean shutdown.
 import socket
 import signal
 import sys
+import time
 
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
@@ -19,6 +20,7 @@ ACK = "ACK"
 SYN_ACK = "SYN-ACK"
 FIN = "FIN"
 FIN_ACK = "FIN-ACK"
+NACK = "NACK"
 
 running = True
 packet_size = False
@@ -203,12 +205,12 @@ def main():
 
                             # If waiting for more data or FIN
                             else:
-                                print('Waiting for packet count or FIN from client')
-                                packet_count_data, _ = server_socket.recvfrom(1024)
-                                packet_count = packet_count_data.decode()
+                                print('Waiting for client request')
+                                first_request, _ = server_socket.recvfrom(1024)
+                                first_packet = first_request.decode()
 
                                 # 4-way handshake
-                                if packet_count == 'FIN':
+                                if first_packet == 'FIN':
                                     print('Received FIN from client')
                                     server_socket.sendto(ACK.encode(), client_addr)
                                     print('Sent ACK for FIN to client')
@@ -225,13 +227,37 @@ def main():
                                         server_socket.settimeout(time_out)  # Set server default time-out
                                         print(f'Server default timeout: {time_out}s')
 
-                                # Process incoming data
+                                # Client wants to send data
+                                elif first_packet == 'PSH':
+                                    print("Received PSH from client")
+                                    print("Authenticating client...")
+                                    time.sleep(0.5)
+
+                                    # Authenticated client
+                                    if client_addr in clients:
+                                        print("Client authenticated")
+                                        server_socket.sendto(ACK.encode(), client_addr)
+                                        print('Sent ACK for PSH to client')
+
+                                        # receive packet count
+                                        packet_count, _ = server_socket.recvfrom(1024)
+                                        packet_count = int(packet_count.decode())
+                                        print('Received packet count:', packet_count)
+                                        for _ in range(packet_count):
+                                            data, _ = server_socket.recvfrom(1024)
+                                            packets.append(data)
+
+                                    # Unauthenticated client
+                                    else:
+                                        print("Client not authenticated")
+                                        server_socket.sendto(NACK.encode(), client_addr)
+                                        print('Sent NACK for PSH to client')
+                                        server_socket.settimeout(time_out)
+
+                                # No incoming requests
                                 else:
-                                    packet_count = int(packet_count)
-                                    print('Received packet count:', packet_count)
-                                    for _ in range(packet_count):
-                                        data, _ = server_socket.recvfrom(1024)
-                                        packets.append(data)
+                                    print("Client has not made specific requests")
+                                    server_socket.settimeout(time_out)
 
                         except socket.error as e:
                             print(e)

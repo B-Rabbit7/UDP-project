@@ -17,6 +17,7 @@ SYN = "SYN"
 ACK = "ACK"
 SYN_ACK = "SYN-ACK"
 FIN = "FIN"
+PSH = "PSH"
 
 time_out = 4
 
@@ -85,6 +86,11 @@ def receive_syn_ack(server_socket):
     else:
         print("Failed: Received invalid SYN-ACK from server")
         return False
+
+
+def send_psh(server_socket, udp_ip, udp_port):
+    server_socket.sendto(PSH.encode(), (udp_ip, udp_port))
+    print("Sent PSH")
 
 
 def send_final_ack(server_socket, udp_ip, udp_port):
@@ -156,43 +162,53 @@ def main():
                 client_socket.sendto(ACK.encode(), (udp_ip, udp_port))
                 print("Sent ACK to server")
 
-                # Send packet size
-                print("Sending packet size")
-                client_socket.sendto(str(packet_count).encode(), (udp_ip, udp_port))
-                print("Sending %s with %d packets" % (filename, packet_count))
-                time.sleep(0.0001)
+                # Send PSH request
+                send_psh(client_socket, udp_ip, udp_port)
 
-                # Sending file data
-                for i in range(0, packet_count):
-                    client_socket.sendto(file_descriptor.read(buffer_size).encode(), (udp_ip, udp_port))
+                # Get authenticated
+                authenticated = client_socket.recvfrom(1024)
+                if authenticated[0] == ACK.encode():
+                    # Send packet size
+                    print("Sending packet size")
+                    client_socket.sendto(str(packet_count).encode(), (udp_ip, udp_port))
+                    print("Sending %s with %d packets" % (filename, packet_count))
                     time.sleep(0.0001)
 
-                # Print results
-                results, addr = client_socket.recvfrom(1024)
-                print(results.decode())
-
-                # Start 4-way handshake
-                send_fin(client_socket, udp_ip, udp_port)
-                if receive_fin_ack(client_socket):
-                    print("Received ACK for FIN from server")
-                    time.sleep(0.0001)
-                    if receive_fin(client_socket):
-                        print("Received FIN from server")
+                    # Sending file data
+                    for i in range(0, packet_count):
+                        client_socket.sendto(file_descriptor.read(buffer_size).encode(), (udp_ip, udp_port))
                         time.sleep(0.0001)
-                        send_final_ack(client_socket, udp_ip, udp_port)
-                        print("Sent final ACK to server")
-                        time.sleep(0.0001)
-                        file_descriptor.close()
-                        client_socket.close()
 
-                    # Error1: 4-way handshake failed
+                    # Print results
+                    results, addr = client_socket.recvfrom(1024)
+                    print(results.decode())
+
+                    # Start 4-way handshake
+                    send_fin(client_socket, udp_ip, udp_port)
+                    if receive_fin_ack(client_socket):
+                        print("Received ACK for FIN from server")
+                        time.sleep(0.0001)
+                        if receive_fin(client_socket):
+                            print("Received FIN from server")
+                            time.sleep(0.0001)
+                            send_final_ack(client_socket, udp_ip, udp_port)
+                            print("Sent final ACK to server")
+                            time.sleep(0.0001)
+                            file_descriptor.close()
+                            client_socket.close()
+
+                        # Error1: 4-way handshake failed
+                        else:
+                            print("Failed to receive FIN from server. Closing connection.")
+                            client_socket.close()
+
+                    # Error2: 4-way handshake failed
                     else:
-                        print("Failed to receive FIN from server. Closing connection.")
+                        print("Failed to receive ACK for FIN from server. Closing connection.")
                         client_socket.close()
-
-                # Error2: 4-way handshake failed
                 else:
-                    print("Failed to receive ACK for FIN from server. Closing connection.")
+                    print("Client could not be authenticated")
+                    client_socket.settimeout(time_out)
                     client_socket.close()
 
             # Error: 3-way handshake failed
