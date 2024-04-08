@@ -11,7 +11,6 @@ Ctrl+C) for a clean shutdown.
 import socket
 import signal
 import sys
-import time
 
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
@@ -23,7 +22,6 @@ FIN_ACK = "FIN-ACK"
 
 running = True
 packet_size = False
-global server_socket
 
 time_out = 4
 clients = []  # List of verified clients
@@ -179,6 +177,8 @@ def main():
     while running:
         try:
             print("Server is listening for incoming connections...")
+
+            # Start 3-way handshake
             syn_received, client_addr = receive_syn(server_socket)
             if syn_received:
                 send_syn_ack(server_socket, client_addr)
@@ -189,18 +189,24 @@ def main():
                     packets = []
                     expected_packet_count = True
 
+                    # Process data
                     while expected_packet_count:
                         try:
+
+                            # If all data has been received
                             if packets:
                                 print('Received all packets, processing content analysis')
                                 results = process_data(packets)
                                 print(results)
                                 server_socket.sendto(results.encode(), client_addr)
                                 packets = []
+
+                            # If waiting for more data or FIN
                             else:
                                 print('Waiting for packet count or FIN from client')
                                 packet_count_data, _ = server_socket.recvfrom(1024)
                                 packet_count = packet_count_data.decode()
+
                                 # 4-way handshake
                                 if packet_count == 'FIN':
                                     print('Received FIN from client')
@@ -216,9 +222,10 @@ def main():
                                         expected_packet_count = False
                                     else:
                                         print('Failed: Did not receive final ACK from client after sending FIN')
-                                        # Set server default time-out
-                                        server_socket.settimeout(time_out)
+                                        server_socket.settimeout(time_out)  # Set server default time-out
                                         print(f'Server default timeout: {time_out}s')
+
+                                # Process incoming data
                                 else:
                                     packet_count = int(packet_count)
                                     print('Received packet count:', packet_count)
@@ -230,8 +237,12 @@ def main():
                             print(e)
                             running = False
                     print("Connection with client ended.")
+
+                # Error2: No ack received
                 else:
                     print("Failed: Did not receive final ACK from client")
+
+            # Error1: No syn received
             else:
                 print("Failed: Did not receive SYN from client")
         except socket.error as e:
