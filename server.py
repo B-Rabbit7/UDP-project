@@ -26,6 +26,7 @@ packet_size = False
 global server_socket
 
 time_out = 4
+clients = []  # List of verified clients
 
 
 def get_character_count(text):
@@ -108,6 +109,7 @@ def process_data(packets):
     except UnicodeDecodeError:
         print("Data is not valid UTF-8, handle as binary or other encoding")
 
+
 def send_syn_ack(client_socket, address):
     """
     Send a SYN-ACK response to the client.
@@ -118,6 +120,7 @@ def send_syn_ack(client_socket, address):
     """
     client_socket.sendto(SYN_ACK.encode(), address)
     print("Sent SYN-ACK to Client")
+
 
 def receive_syn(client_socket):
     """
@@ -133,7 +136,8 @@ def receive_syn(client_socket):
     else:
         print("Failed: Received SYN response from Client")
         return False, None
-    
+
+
 def receive_final_ack(client_socket):
     """
     Receive a final ACK response from the client.
@@ -153,6 +157,7 @@ def receive_final_ack(client_socket):
         print(f"Failed: Error receiving final ACK - {e}")
         return False
 
+
 def main():
     """
     Main function to start the server.
@@ -164,11 +169,13 @@ def main():
     global running
     running = True
 
+    # set up socket and SIGINT
     ip_version = socket.AF_INET if ':' not in UDP_IP else socket.AF_INET6
     server_socket = socket.socket(ip_version, socket.SOCK_DGRAM)
     server_socket.bind((UDP_IP, UDP_PORT))
     signal.signal(signal.SIGINT, signal_handler)
 
+    # Server loop
     while running:
         try:
             print("Server is listening for incoming connections...")
@@ -177,7 +184,8 @@ def main():
                 send_syn_ack(server_socket, client_addr)
                 if receive_final_ack(server_socket):
                     print(f"Connection established with client {client_addr}")
-
+                    clients.append(client_addr)
+                    print(f'Client {client_addr} added to verified client list')
                     packets = []
                     expected_packet_count = True
 
@@ -208,12 +216,12 @@ def main():
                                         expected_packet_count = False
                                     else:
                                         print('Failed: Did not receive final ACK from client after sending FIN')
+                                        # Set server default time-out
+                                        server_socket.settimeout(time_out)
+                                        print(f'Server default timeout: {time_out}s')
                                 else:
                                     packet_count = int(packet_count)
                                     print('Received packet count:', packet_count)
-                                    # Set server default time-out
-                                    server_socket.settimeout(time_out)
-                                    print(f'Server default timeout: {time_out}s')
                                     for _ in range(packet_count):
                                         data, _ = server_socket.recvfrom(1024)
                                         packets.append(data)
