@@ -1,7 +1,7 @@
 """
 Created on Sat Feb 24
-@author: Set
-Student Number: A01308077
+@author: Set & Jason
+Student Number: A01308077 & A10307299
 
 The purpose of this client script is to read a text file specified by the user and send its contents over a UDP
 connection to a server for analysis. It calculates the number of packets needed to transmit the file's data based on
@@ -13,6 +13,10 @@ import sys
 import os
 import time
 
+SYN = "SYN"
+ACK = "ACK"
+SYN_ACK = "SYN-ACK"
+FIN = "FIN"
 
 def handle_file(filename):
     """
@@ -64,15 +68,54 @@ def get_packet_count(filename, buffer_size):
 
     return packet_count
 
+def send_syn(server_socket, udp_ip, udp_port):
+    server_socket.sendto(SYN.encode(), (udp_ip, udp_port))
+    print("Sent SYN")
+
+def receive_syn_ack(server_socket):
+    syn_ack, addr = server_socket.recvfrom(1024)
+    if syn_ack.decode() == SYN_ACK:
+        print("Received SYN-ACK from server")
+        return True
+    else:
+        print("Failed: Received invalid SYN-ACK from server")
+        return False
+
+def send_final_ack(server_socket, udp_ip, udp_port):
+    server_socket.sendto(ACK.encode(), (udp_ip, udp_port))
+    print("Sent final ACK")
+
+def send_fin(server_socket, udp_ip, udp_port):
+    server_socket.sendto(FIN.encode(), (udp_ip, udp_port))
+    print("Sent FIN")
+
+def receive_fin_ack(server_socket):
+    fin_ack, addr = server_socket.recvfrom(1024)
+    print(fin_ack.decode())
+    if fin_ack.decode() == ACK:
+        print("Received ACK for FIN from server")
+        return True
+    else:
+        print("Failed: Received invalid ACK for FIN from server")
+        return False
+
+def receive_fin(server_socket):
+    fin, addr = server_socket.recvfrom(1024)
+    if fin.decode() == FIN:
+        print("Received FIN from server")
+        return True
+    else:
+        print("Failed: Received invalid FIN from server")
+        return False
+
+def send_final_ack(server_socket, udp_ip, udp_port):
+    server_socket.sendto(ACK.encode(), (udp_ip, udp_port))
+    print("Sent final ACK")
 
 def main():
-    """
-    Main function to send file data over UDP to a server for analysis.
-    """
     buffer_size = 512
-    # Check the number of command-line arguments
     if len(sys.argv) != 4:
-        print("Error: Please provide exactly 3 argument (the path to the text file).")
+        print("Error: Please provide exactly 3 arguments (the path to the text file).")
         sys.exit(1)
 
     udp_ip = sys.argv[1]
@@ -93,21 +136,44 @@ def main():
 
     try:
         if client_socket is not None:
-            print("Sending packet size")
-            client_socket.sendto(str(packet_count).encode(), (udp_ip, udp_port))
-            print("Sending %s with %d packets" % (filename, packet_count))
-            time.sleep(0.0001)
-            for i in range(0, packet_count):
-                client_socket.sendto(file_descriptor.read(buffer_size).encode(), (udp_ip, udp_port))
+            send_syn(client_socket, udp_ip, udp_port)
+            if receive_syn_ack(client_socket):
+                # Send ACK to complete the three-way handshake
+                client_socket.sendto(ACK.encode(), (udp_ip, udp_port))
+                print("Sent ACK to server")
+                print("Sending packet size")
+                client_socket.sendto(str(packet_count).encode(), (udp_ip, udp_port))
+                print("Sending %s with %d packets" % (filename, packet_count))
                 time.sleep(0.0001)
-            client_socket.sendto(b'END', (udp_ip, udp_port))
-            print("Sent all %d packets\n" % packet_count)
-            results, addr = client_socket.recvfrom(1024)
-            print(results.decode())
-            file_descriptor.close()
+                for i in range(0, packet_count):
+                    client_socket.sendto(file_descriptor.read(buffer_size).encode(), (udp_ip, udp_port))
+                    time.sleep(0.0001)
+                # 4-way handshake
+                send_fin(client_socket, udp_ip, udp_port)
+                if receive_fin_ack(client_socket):
+                    print("Received ACK for FIN from server")
+                    time.sleep(0.0001)
+                    if receive_fin(client_socket):
+                        print("Received FIN from server")
+                        time.sleep(0.0001)
+                        send_final_ack(client_socket, udp_ip, udp_port)
+                        print("Sent final ACK to server")
+                        time.sleep(0.0001)
+                        results, addr = client_socket.recvfrom(1024)
+                        print(results.decode())
+                        file_descriptor.close()
+                        client_socket.close()
+                    else:
+                        print("Failed to receive FIN from server. Closing connection.")
+                        client_socket.close()
+                else:
+                    print("Failed to receive ACK for FIN from server. Closing connection.")
+                    client_socket.close()
+            else:
+                print("Handshake failed. Closing connection.")
+                client_socket.close()
     except socket.error as error:
         print(f"Error: {error}")
-
 
 if __name__ == "__main__":
     main()
