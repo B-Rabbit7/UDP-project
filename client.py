@@ -107,20 +107,16 @@ def receive_fin_ack(server_socket):
     fin_ack, addr = server_socket.recvfrom(1024)
     print(fin_ack.decode())
     if fin_ack.decode() == ACK:
-        print("Received ACK for FIN from server")
         return True
     else:
-        print("Failed: Received invalid ACK for FIN from server")
         return False
 
 
 def receive_fin(server_socket):
     fin, addr = server_socket.recvfrom(1024)
     if fin.decode() == FIN:
-        print("Received FIN from server")
         return True
     else:
-        print("Failed: Received invalid FIN from server")
         return False
 
 
@@ -176,7 +172,10 @@ def main():
 
                     # Sending file data
                     for i in range(0, packet_count):
-                        client_socket.sendto(file_descriptor.read(buffer_size).encode(), (udp_ip, udp_port))
+                        packet_number = i + 1 
+                        packet_data = file_descriptor.read(buffer_size)
+                        packet_with_number = f"{packet_number}:{packet_data}" 
+                        client_socket.sendto(packet_with_number.encode(), (udp_ip, udp_port))
                         time.sleep(0.0001)
 
                     # Print results

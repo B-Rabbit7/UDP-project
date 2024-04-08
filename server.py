@@ -98,16 +98,33 @@ def process_data(packets):
     Returns:
     - str: A response containing the analysis results of the received data.
     """
-    received_data = b''.join(packets)
+    packet_dict = {} 
+    for packet in packets:
+        packet_number, packet_data = packet.split(b':', 1)  
+        packet_dict[int(packet_number)] = packet_data  
+
+    expected_packet_number = 1
+    for i in range(expected_packet_number, len(packet_dict) + 1):
+        if i not in packet_dict:
+            print(f"Missing packet: {i}")
+            return "Missing packet"
+        elif i == len(packet_dict):
+            break 
+        expected_packet_number += 1
+
+    received_data = b''.join(packet_dict[i] for i in range(1, len(packet_dict) + 1))
+
     try:
         character_count = get_character_count(received_data)
         word_count = get_word_count(received_data)
         frequency = get_frequency_of_chars(received_data)
         response = (f'Server Response:\n\tCharacter count: {character_count}\n\tWords: {word_count}\n\t'
                     f'Frequency:{frequency}')
+        print("Processed data successfully")
         return response
     except UnicodeDecodeError:
         print("Data is not valid UTF-8, handle as binary or other encoding")
+
 
 
 def send_syn_ack(client_socket, address):
