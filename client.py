@@ -206,6 +206,8 @@ def main():
                     else:
                         print("Failed to receive ACK for FIN from server. Closing connection.")
                         client_socket.close()
+
+                # Error4: Client PSH was not authenticated
                 else:
                     print("Client could not be authenticated")
                     client_socket.settimeout(time_out)
