@@ -18,6 +18,7 @@ ACK = "ACK"
 SYN_ACK = "SYN-ACK"
 FIN = "FIN"
 
+time_out = 4
 
 def handle_file(filename):
     """
@@ -133,6 +134,10 @@ def main():
 
     ip_version = socket.AF_INET if ':' not in udp_ip else socket.AF_INET6
     client_socket = socket.socket(ip_version, socket.SOCK_DGRAM)
+
+    # set default time-out
+    client_socket.settimeout(time_out)
+    print(f'Client default timeout: {time_out}s')
 
     file_descriptor = handle_file(filename)
 

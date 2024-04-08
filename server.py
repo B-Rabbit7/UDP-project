@@ -13,9 +13,6 @@ import signal
 import sys
 import time
 
-running = True
-packet_size = False
-global server_socket
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
 SYN = "SYN"
@@ -23,6 +20,12 @@ ACK = "ACK"
 SYN_ACK = "SYN-ACK"
 FIN = "FIN"
 FIN_ACK = "FIN-ACK"
+
+running = True
+packet_size = False
+global server_socket
+
+time_out = 4
 
 
 def get_character_count(text):
@@ -208,9 +211,13 @@ def main():
                                 else:
                                     packet_count = int(packet_count)
                                     print('Received packet count:', packet_count)
+                                    # Set server default time-out
+                                    server_socket.settimeout(time_out)
+                                    print(f'Server default timeout: {time_out}s')
                                     for _ in range(packet_count):
                                         data, _ = server_socket.recvfrom(1024)
                                         packets.append(data)
+
                         except socket.error as e:
                             print(e)
                             running = False
