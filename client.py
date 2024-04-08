@@ -18,6 +18,7 @@ ACK = "ACK"
 SYN_ACK = "SYN-ACK"
 FIN = "FIN"
 
+
 def handle_file(filename):
     """
     Open and validate the specified file.
@@ -68,9 +69,11 @@ def get_packet_count(filename, buffer_size):
 
     return packet_count
 
+
 def send_syn(server_socket, udp_ip, udp_port):
     server_socket.sendto(SYN.encode(), (udp_ip, udp_port))
     print("Sent SYN")
+
 
 def receive_syn_ack(server_socket):
     syn_ack, addr = server_socket.recvfrom(1024)
@@ -81,13 +84,16 @@ def receive_syn_ack(server_socket):
         print("Failed: Received invalid SYN-ACK from server")
         return False
 
+
 def send_final_ack(server_socket, udp_ip, udp_port):
     server_socket.sendto(ACK.encode(), (udp_ip, udp_port))
     print("Sent final ACK")
 
+
 def send_fin(server_socket, udp_ip, udp_port):
     server_socket.sendto(FIN.encode(), (udp_ip, udp_port))
     print("Sent FIN")
+
 
 def receive_fin_ack(server_socket):
     fin_ack, addr = server_socket.recvfrom(1024)
@@ -99,6 +105,7 @@ def receive_fin_ack(server_socket):
         print("Failed: Received invalid ACK for FIN from server")
         return False
 
+
 def receive_fin(server_socket):
     fin, addr = server_socket.recvfrom(1024)
     if fin.decode() == FIN:
@@ -108,9 +115,11 @@ def receive_fin(server_socket):
         print("Failed: Received invalid FIN from server")
         return False
 
+
 def send_final_ack(server_socket, udp_ip, udp_port):
     server_socket.sendto(ACK.encode(), (udp_ip, udp_port))
     print("Sent final ACK")
+
 
 def main():
     buffer_size = 512
@@ -148,6 +157,11 @@ def main():
                 for i in range(0, packet_count):
                     client_socket.sendto(file_descriptor.read(buffer_size).encode(), (udp_ip, udp_port))
                     time.sleep(0.0001)
+
+                # Print results
+                results, addr = client_socket.recvfrom(1024)
+                print(results.decode())
+
                 # 4-way handshake
                 send_fin(client_socket, udp_ip, udp_port)
                 if receive_fin_ack(client_socket):
@@ -159,8 +173,6 @@ def main():
                         send_final_ack(client_socket, udp_ip, udp_port)
                         print("Sent final ACK to server")
                         time.sleep(0.0001)
-                        results, addr = client_socket.recvfrom(1024)
-                        print(results.decode())
                         file_descriptor.close()
                         client_socket.close()
                     else:
@@ -174,6 +186,7 @@ def main():
                 client_socket.close()
     except socket.error as error:
         print(f"Error: {error}")
+
 
 if __name__ == "__main__":
     main()
