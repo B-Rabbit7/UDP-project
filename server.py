@@ -229,8 +229,6 @@ def main():
                                     server_socket.sendto(ACK.encode(), client_addr)
                                     print('Sent ACK for FIN to client')
                                     server_socket.sendto(FIN.encode(), client_addr)
-                                    print(FIN.encode())
-                                    print(client_addr)
                                     print('Sent own FIN to client')
                                     final_ack_data, _ = server_socket.recvfrom(1024)
                                     if final_ack_data.decode() == ACK:
