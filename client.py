@@ -1,8 +1,4 @@
 """
-Created on Sat Feb 24
-@author: Set & Jason
-Student Number: A01308077 & A10307299
-
 The purpose of this client script is to read a text file specified by the user and send its contents over a UDP
 connection to a server for analysis. It calculates the number of packets needed to transmit the file's data based on
 a predefined buffer size. The client then sends each packet sequentially, along with a special "END" packet to signal
@@ -18,6 +14,8 @@ ACK = "ACK"
 SYN_ACK = "SYN-ACK"
 FIN = "FIN"
 PSH = "PSH"
+PROXY_IP = "127.0.0.1"
+PROXY_PORT = 8888
 
 time_out = 4
 
@@ -127,7 +125,7 @@ def main():
         sys.exit(1)
 
     udp_ip = sys.argv[1]
-    udp_port = int(sys.argv[2])
+    udp_port = int(sys.argv[2]) # PROXY_PORT
     filename = sys.argv[3]
 
     ip_version = socket.AF_INET if ':' not in udp_ip else socket.AF_INET6

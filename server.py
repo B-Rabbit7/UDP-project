@@ -1,8 +1,4 @@
 """
-Created on Sat Feb 24
-@author: Set & Jason
-Student Number: A01308077 & A10307299
-
 The purpose of this server is to provide character count, word count, and character frequency analysis for the text
 data it receives over UDP (User Datagram Protocol). It listens for incoming data packets, aggregates them,
 and performs the requested analysis once all packets are received. It gracefully handles the termination signal (
@@ -13,14 +9,15 @@ import signal
 import sys
 import time
 
-UDP_IP = "127.0.0.1"
-UDP_PORT = 5005
 SYN = "SYN"
 ACK = "ACK"
 SYN_ACK = "SYN-ACK"
 FIN = "FIN"
 FIN_ACK = "FIN-ACK"
 NACK = "NACK"
+
+PROXY_IP = "127.0.0.1"
+PROXY_PORT = 8889
 
 running = True
 packet_size = False
@@ -187,9 +184,9 @@ def main():
     running = True
 
     # set up socket and SIGINT
-    ip_version = socket.AF_INET if ':' not in UDP_IP else socket.AF_INET6
+    ip_version = socket.AF_INET if ':' not in PROXY_IP else socket.AF_INET6
     server_socket = socket.socket(ip_version, socket.SOCK_DGRAM)
-    server_socket.bind((UDP_IP, UDP_PORT))
+    server_socket.bind((PROXY_IP, PROXY_PORT))
     signal.signal(signal.SIGINT, signal_handler)
 
     # Server loop
