@@ -1,3 +1,4 @@
+import select
 import socket
 
 # Proxy configuration
@@ -30,55 +31,26 @@ def main():
 
     try:
         while True:
-            # Receive SYN from client
-            client_data, client_addr = proxy_socket.recvfrom(1024)
-            print(f"Received data from client: {client_data}")
+            # Listen for packets from both client and server simultaneously
+            ready_sockets, _, _ = select.select([proxy_socket, server_socket], [], [])
 
-            # Forward SYN to server
-            handle_client_to_server(client_data, server_socket)
+            for ready_socket in ready_sockets:
+                if ready_socket == proxy_socket:
+                    # Packet received from client
+                    client_data, client_addr = proxy_socket.recvfrom(1024)
+                    print(f"Received data from client: {client_data}")
 
-            # Receive response from server
-            server_data, _ = server_socket.recvfrom(1024)
-            print(f"Received data from server: {server_data}")
+                    # Forward packet to server
+                    handle_client_to_server(client_data, server_socket)
 
-            # Forward SYN-ACK to client
-            proxy_socket.sendto(server_data, client_addr)
-            print(f"Proxy sent to client: {server_data}")
+                elif ready_socket == server_socket:
+                    # Packet received from server
+                    server_data, server_addr = server_socket.recvfrom(1024)
+                    print(f"Received data from server: {server_data}")
 
-            # Receive ACK for SYN-ACK from client
-            client_data, client_addr = proxy_socket.recvfrom(1024)
-            print(f"Received data from client: {client_data}")
-
-            # Send ACK to Server to finish 3way handshake
-            handle_client_to_server(client_data, server_socket)
-            print(f"Send data to server:{client_data}")
-
-            if client_data == b'FIN':
-                print("FIN went through")
-
-                # Receive ACK from server
-                server_data, _ = server_socket.recvfrom(1024)
-                print(f"Received data from server: {server_data}")
-
-                # Send ACK to client
-                proxy_socket.sendto(server_data, client_addr)
-                print(f"Proxy sent to client: {server_data}")
-
-                # Receive FIN from server
-                server_data, _ = server_socket.recvfrom(1024)
-                print(f"Received data from server: {server_data}")
-
-                # Send FIN to client
-                proxy_socket.sendto(server_data, client_addr)
-                print(f"Proxy sent to client: {server_data}")
-
-                # Receive ACK from client
-                client_data, client_addr = proxy_socket.recvfrom(1024)
-                print(f"Received data from client: {client_data}")
-
-                # Send ACK to server
-                handle_client_to_server(client_data, server_socket)
-                print(f"Send data to server:{client_data}")
+                    # Forward packet to client
+                    proxy_socket.sendto(server_data, client_addr)
+                    print(f"Proxy sent to client: {server_data}")
 
     except KeyboardInterrupt:
         print("Proxy shutting down...")
