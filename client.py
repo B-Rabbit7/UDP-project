@@ -132,7 +132,6 @@ def main():
     client_socket = socket.socket(ip_version, socket.SOCK_DGRAM)
 
     # Set default time-out
-    client_socket.settimeout(time_out)
     print(f'Client default timeout: {time_out}s')
 
     # Initiating file descriptor
@@ -207,7 +206,6 @@ def main():
                 # Error4: Client PSH was not authenticated
                 else:
                     print("Client could not be authenticated")
-                    client_socket.settimeout(time_out)
                     client_socket.close()
 
             # Error: 3-way handshake failed
