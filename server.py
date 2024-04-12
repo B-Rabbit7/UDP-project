@@ -20,10 +20,7 @@ PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8889
 
 running = True
-packet_size = False
-
-time_out = 4
-clients = []  # List of verified clients
+clients = set()  # Set of verified clients
 
 
 def get_character_count(text):
@@ -70,7 +67,6 @@ def get_frequency_of_chars(text):
         char_dict[chr(letter)] += 1
     return char_dict
 
-
 def signal_handler(sig, frame):
     """
     Handle the SIGINT signal (Ctrl+C) to gracefully shut down the server.
@@ -84,6 +80,57 @@ def signal_handler(sig, frame):
     running = False
     sys.exit(0)
 
+def send_packet(socket, packet, address):
+    """Send a packet to the specified address."""
+    socket.sendto(packet.encode(), address)
+
+def receive_packet(socket):
+    """Receive a packet from the socket."""
+    return socket.recvfrom(1024)
+
+def send_syn_ack(client_socket, address):
+    """Send a SYN-ACK response to the client."""
+    send_packet(client_socket, SYN_ACK, address)
+    print("Sent SYN-ACK to Client")
+
+def receive_syn(client_socket):
+    """Receive a SYN request from the client."""
+    syn, addr = receive_packet(client_socket)
+    if syn.decode() == SYN:
+        print("Received SYN from Client")
+        return True, addr
+    else:
+        print("Failed: Received SYN response from Client")
+        return False, None
+
+def receive_final_ack(client_socket):
+    """Receive a final ACK response from the client."""
+    try:
+        final_ack, addr = receive_packet(client_socket)
+        if final_ack.decode() == ACK:
+            print("Received final ACK from Client")
+            return True
+        else:
+            print("Failed: Received invalid response from Client")
+            return False
+    except Exception as e:
+        print(f"Failed: Error receiving final ACK - {e}")
+        return False
+
+def authenticate_client(client_socket, address):
+    """Authenticate the client."""
+    print("Authenticating client...")
+    time.sleep(0.5)
+    if address in clients:
+        print("Client authenticated")
+        send_packet(client_socket, ACK, address)
+        print('Sent ACK for PSH to client')
+        return True
+    else:
+        print("Client not authenticated")
+        send_packet(client_socket, NACK, address)
+        print('Sent NACK for PSH to client')
+        return False
 
 def process_data(packets):
     """
@@ -95,10 +142,10 @@ def process_data(packets):
     Returns:
     - str: A response containing the analysis results of the received data.
     """
-    packet_dict = {} 
+    packet_dict = {}
     for packet in packets:
-        packet_number, packet_data = packet.split(b':', 1)  
-        packet_dict[int(packet_number)] = packet_data  
+        packet_number, packet_data = packet.split(b':', 1)
+        packet_dict[int(packet_number)] = packet_data
 
     expected_packet_number = 1
     for i in range(expected_packet_number, len(packet_dict) + 1):
@@ -106,7 +153,7 @@ def process_data(packets):
             print(f"Missing packet: {i}")
             return "Missing packet"
         elif i == len(packet_dict):
-            break 
+            break
         expected_packet_number += 1
 
     received_data = b''.join(packet_dict[i] for i in range(1, len(packet_dict) + 1))
@@ -122,55 +169,78 @@ def process_data(packets):
     except UnicodeDecodeError:
         print("Data is not valid UTF-8, handle as binary or other encoding")
 
+def handle_client_request(client_socket, address):
+    """Handle a client request."""
+    while True:
+        try:
+            print('Waiting for client request')
+            first_request, _ = receive_packet(client_socket)
+            first_packet = first_request.decode()
 
+            if first_packet == 'FIN':
+                print('Received FIN from client')
+                send_packet(client_socket, ACK, address)
+                print('Sent ACK for FIN to client')
+                send_packet(client_socket, FIN, address)
+                print('Sent own FIN to client')
+                if receive_final_ack(client_socket):
+                    print('Received final ACK from client')
+                    break
+                else:
+                    print('Failed: Did not receive final ACK from client after sending FIN')
+            elif first_packet == 'PSH':
+                print("Received PSH from client")
+                if authenticate_client(client_socket, address):
+                    packet_count, _ = receive_packet(client_socket)
+                    packet_count = int(packet_count.decode())
+                    print('Received packet count:', packet_count)
+                    packets = [receive_packet(client_socket)[0] for _ in range(packet_count)]
+                    results = process_data(packets)
+                    print(results)
+                    send_packet(client_socket, results, address)
+                else:
+                    break
+            else:
+                print("Client has not made specific requests")
+        except socket.error as e:
+            print(e)
+            break
 
-def send_syn_ack(client_socket, address):
+def perform_three_way_handshake(server_socket):
     """
-    Send a SYN-ACK response to the client.
+    Perform the 3-way handshake with the client.
 
     Parameters:
-    - client_socket (socket): The client socket.
-    - address (str): The client address.
-    """
-    client_socket.sendto(SYN_ACK.encode(), address)
-    print("Sent SYN-ACK to Client")
+    - server_socket (socket): The server socket.
 
-
-def receive_syn(client_socket):
-    """
-    Receive a SYN request from the client.
-
-    Parameters:
-    - client_socket (socket): The client socket.
-    """
-    syn, addr = client_socket.recvfrom(1024)
-    if syn.decode() == SYN:
-        print("Received SYN from Client")
-        return True, addr
-    else:
-        print("Failed: Received SYN response from Client")
-        return False, None
-
-
-def receive_final_ack(client_socket):
-    """
-    Receive a final ACK response from the client.
-
-    Parameters:
-    - client_socket (socket): The client socket.
+    Returns:
+    - bool: True if the handshake is successful, False otherwise.
+    - tuple: The client address if the handshake is successful, None otherwise.
     """
     try:
-        final_ack, addr = client_socket.recvfrom(1024)
+        # Receive SYN
+        syn, client_addr = server_socket.recvfrom(1024)
+        if syn.decode() == SYN:
+            print("Received SYN from Client")
+        else:
+            print("Failed: Received SYN response from Client")
+            return False, None
+
+        # Send SYN-ACK
+        server_socket.sendto(SYN_ACK.encode(), client_addr)
+        print("Sent SYN-ACK to Client")
+
+        # Receive final ACK
+        final_ack, _ = server_socket.recvfrom(1024)
         if final_ack.decode() == ACK:
             print("Received final ACK from Client")
-            return True
+            return True, client_addr
         else:
             print("Failed: Received invalid response from Client")
-            return False
+            return False, None
     except Exception as e:
-        print(f"Failed: Error receiving final ACK - {e}")
-        return False
-
+        print(f"Failed: Error during 3-way handshake - {e}")
+        return False, None
 
 def main():
     """
@@ -194,99 +264,17 @@ def main():
         try:
             print("Server is listening for incoming connections...")
 
-            # Start 3-way handshake
-            syn_received, client_addr = receive_syn(server_socket)
-            if syn_received:
-                send_syn_ack(server_socket, client_addr)
-                if receive_final_ack(server_socket):
-                    print(f"Connection established with client {client_addr}")
-                    clients.append(client_addr)
-                    print(f'Client {client_addr} added to verified client list')
-                    packets = []
-                    expected_packet_count = True
+            handshake_success, client_addr = perform_three_way_handshake(server_socket)
+            if handshake_success:
+                print(f"Connection established with client {client_addr}")
+                clients.add(client_addr)
+                print(f'Client {client_addr} added to verified client list')
+                handle_client_request(server_socket, client_addr)
+                print("Connection with client ended.")
 
-                    # Process data
-                    while expected_packet_count:
-                        try:
-
-                            # If all data has been received
-                            if packets:
-                                print('Received all packets, processing content analysis')
-                                results = process_data(packets)
-                                print(results)
-                                server_socket.sendto(results.encode(), client_addr)
-                                packets = []
-
-                            # If waiting for more data or FIN
-                            else:
-                                print('Waiting for client request')
-                                first_request, _ = server_socket.recvfrom(1024)
-                                first_packet = first_request.decode()
-
-                                # 4-way handshake
-                                if first_packet == 'FIN':
-                                    print('Received FIN from client')
-                                    server_socket.sendto(ACK.encode(), client_addr)
-                                    print('Sent ACK for FIN to client')
-                                    server_socket.sendto(FIN.encode(), client_addr)
-                                    print('Sent own FIN to client')
-                                    final_ack_data, _ = server_socket.recvfrom(1024)
-                                    if final_ack_data.decode() == ACK:
-                                        print('Received final ACK from client')
-                                        expected_packet_count = False
-                                    else:
-                                        print('Failed: Did not receive final ACK from client after sending FIN')
-                                        server_socket.settimeout(time_out)  # Set server default time-out
-                                        print(f'Server default timeout: {time_out}s')
-
-                                # Client wants to send data
-                                elif first_packet == 'PSH':
-                                    print("Received PSH from client")
-                                    print("Authenticating client...")
-                                    time.sleep(0.5)
-
-                                    # Authenticated client
-                                    if client_addr in clients:
-                                        print("Client authenticated")
-                                        server_socket.sendto(ACK.encode(), client_addr)
-                                        print('Sent ACK for PSH to client')
-
-                                        # receive packet count
-                                        packet_count, _ = server_socket.recvfrom(1024)
-                                        packet_count = int(packet_count.decode())
-                                        print('Received packet count:', packet_count)
-                                        for _ in range(packet_count):
-                                            data, _ = server_socket.recvfrom(1024)
-                                            packets.append(data)
-
-                                    # Unauthenticated client
-                                    else:
-                                        print("Client not authenticated")
-                                        server_socket.sendto(NACK.encode(), client_addr)
-                                        print('Sent NACK for PSH to client')
-                                        server_socket.settimeout(time_out)
-
-                                # No incoming requests
-                                else:
-                                    print("Client has not made specific requests")
-                                    server_socket.settimeout(time_out)
-
-                        except socket.error as e:
-                            print(e)
-                            running = False
-                    print("Connection with client ended.")
-
-                # Error2: No ack received
-                else:
-                    print("Failed: Did not receive final ACK from client")
-
-            # Error1: No syn received
-            else:
-                print("Failed: Did not receive SYN from client")
         except socket.error as e:
             print(e)
             running = False
-
 
 if __name__ == '__main__':
     main()
