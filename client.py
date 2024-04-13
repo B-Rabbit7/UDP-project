@@ -1,3 +1,4 @@
+
 """
 The purpose of this client script is to read a text file specified by the user and send its contents over a UDP
 connection to a server for analysis. It calculates the number of packets needed to transmit the file's data based on
@@ -17,8 +18,7 @@ FIN = "FIN"
 PSH = "PSH"
 PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8888
-TIME_OUT = 8
-MAX_RETRIES = 10
+TIME_OUT = 4
 
 def handle_file(filename):
     """Open and validate the specified file."""
@@ -106,35 +106,16 @@ def send_file_data(client_socket, udp_ip, udp_port, file_descriptor, packet_coun
 
 def three_way_handshake(client_socket, udp_ip, udp_port):
     """Perform the 3-way handshake."""
-    handshake_complete = False
-    retries = 0
-    while retries < MAX_RETRIES and not handshake_complete:
-        # Send SYN
-        client_socket.sendto(SYN.encode(), (udp_ip, udp_port))
-        print("Sent SYN")
-
-        # Receive SYN-ACK or timeout
-        client_socket.settimeout(TIME_OUT)
-        try:
-            syn_ack, addr = client_socket.recvfrom(1024)
-            if syn_ack.decode() == SYN_ACK:
-                print("Received SYN-ACK from server")
-                # Send ACK
-                client_socket.sendto(ACK.encode(), addr)
-                print("Sent ACK to server")
-
-                handshake_complete = True  # Set handshake_complete to True
-        except socket.timeout:
-            print("Timeout: No SYN-ACK from server")
-            retries += 1
-
-    if handshake_complete:
-        print("Handshake complete")
+    send_syn(client_socket, udp_ip, udp_port)
+    if receive_syn_ack(client_socket):
+        client_socket.sendto(ACK.encode(), (udp_ip, udp_port))
+        print("Sent ACK to server")
+        return True
     else:
-        print("Maximum retries reached. Handshake failed.")
+        print("Handshake failed. Closing connection.")
+        client_socket.close()
+        return False
 
-    return handshake_complete
-    
 def four_way_handshake(client_socket, udp_ip, udp_port):
     """Perform the 4-way handshake."""
     send_fin(client_socket, udp_ip, udp_port)

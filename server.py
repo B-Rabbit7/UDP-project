@@ -1,3 +1,4 @@
+
 """
 The purpose of this server is to provide character count, word count, and character frequency analysis for the text
 data it receives over UDP (User Datagram Protocol). It listens for incoming data packets, aggregates them,
@@ -18,9 +19,6 @@ NACK = "NACK"
 
 PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8889
-
-TIME_OUT = 5
-MAX_RETRIES = 10
 
 running = True
 clients = set()  # Set of verified clients
@@ -210,40 +208,40 @@ def handle_client_request(client_socket, address):
             break
 
 def perform_three_way_handshake(server_socket):
-    """Perform the 3-way handshake with the client."""
-    retries = 0
-    while retries < MAX_RETRIES:
-        # Receive SYN or timeout
-        server_socket.settimeout(TIME_OUT)
-        try:
-            syn, client_addr = server_socket.recvfrom(1024)
-            if syn.decode() == SYN:
-                print("Received SYN from client")
-                # Send SYN-ACK
-                server_socket.sendto(SYN_ACK.encode(), client_addr)
-                print("Sent SYN-ACK to client")
-                # Receive ACK
-                while True:
-                    try:
-                        server_socket.settimeout(TIME_OUT)
-                        ack, _ = server_socket.recvfrom(1024)
-                        if ack.decode() == ACK:
-                            print("Received ACK from client")
-                            return True, client_addr
-                    except socket.timeout:
-                        print("Timeout: No ACK packet received from client")
-                        # Increment retries
-                        retries += 1
-                        print("Retransmitting SYN-ACK")
-                        server_socket.sendto(SYN_ACK.encode(), client_addr)
-        except socket.timeout:
-            print("Timeout: No SYN packet received from client")
-            # Increment retries
-            retries += 1
+    """
+    Perform the 3-way handshake with the client.
 
-    print("Maximum retries reached. Handshake failed.")
-    return False, None
+    Parameters:
+    - server_socket (socket): The server socket.
 
+    Returns:
+    - bool: True if the handshake is successful, False otherwise.
+    - tuple: The client address if the handshake is successful, None otherwise.
+    """
+    try:
+        # Receive SYN
+        syn, client_addr = server_socket.recvfrom(1024)
+        if syn.decode() == SYN:
+            print("Received SYN from Client")
+        else:
+            print("Failed: Received SYN response from Client")
+            return False, None
+
+        # Send SYN-ACK
+        server_socket.sendto(SYN_ACK.encode(), client_addr)
+        print("Sent SYN-ACK to Client")
+
+        # Receive final ACK
+        final_ack, _ = server_socket.recvfrom(1024)
+        if final_ack.decode() == ACK:
+            print("Received final ACK from Client")
+            return True, client_addr
+        else:
+            print("Failed: Received invalid response from Client")
+            return False, None
+    except Exception as e:
+        print(f"Failed: Error during 3-way handshake - {e}")
+        return False, None
 
 def main():
     """
@@ -277,12 +275,7 @@ def main():
 
         except socket.error as e:
             print(e)
-
-    # Close the server socket
-    server_socket.close()
-
-    # Once the loop exits, it means the server is shutting down
-    print("Server is shutting down...")
+            running = False
 
 if __name__ == '__main__':
     main()
