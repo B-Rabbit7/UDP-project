@@ -16,6 +16,8 @@ ACK = "ACK"
 SYN_ACK = "SYN-ACK"
 FIN = "FIN"
 PSH = "PSH"
+FIN_ACK = "FIN-ACK"
+SHAKE_ACK = "SHAKE_ACK"
 PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8888
 TIME_OUT = 4
@@ -71,7 +73,7 @@ def send_psh(server_socket, udp_ip, udp_port):
 
 def send_final_ack(server_socket, udp_ip, udp_port):
     """Send final ACK signal to server."""
-    server_socket.sendto(ACK.encode(), (udp_ip, udp_port))
+    server_socket.sendto(FIN_ACK.encode(), (udp_ip, udp_port))
     print("Sent final ACK")
 
 def send_fin(server_socket, udp_ip, udp_port):
@@ -82,7 +84,7 @@ def send_fin(server_socket, udp_ip, udp_port):
 def receive_fin_ack(server_socket):
     """Receive FIN-ACK signal from server."""
     fin_ack, addr = server_socket.recvfrom(1024)
-    if fin_ack.decode() == ACK:
+    if fin_ack.decode() == SHAKE_ACK:
         return True
     else:
         return False
@@ -108,7 +110,7 @@ def three_way_handshake(client_socket, udp_ip, udp_port):
     """Perform the 3-way handshake."""
     send_syn(client_socket, udp_ip, udp_port)
     if receive_syn_ack(client_socket):
-        client_socket.sendto(ACK.encode(), (udp_ip, udp_port))
+        client_socket.sendto(SHAKE_ACK.encode(), (udp_ip, udp_port))
         print("Sent ACK to server")
         return True
     else:

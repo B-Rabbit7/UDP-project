@@ -16,6 +16,7 @@ SYN_ACK = "SYN-ACK"
 FIN = "FIN"
 FIN_ACK = "FIN-ACK"
 NACK = "NACK"
+SHAKE_ACK = "SHAKE_ACK"
 
 PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8889
@@ -108,7 +109,7 @@ def receive_final_ack(client_socket):
     """Receive a final ACK response from the client."""
     try:
         final_ack, addr = receive_packet(client_socket)
-        if final_ack.decode() == ACK:
+        if final_ack.decode() == FIN_ACK:
             print("Received final ACK from Client")
             return True
         else:
@@ -180,7 +181,7 @@ def handle_client_request(client_socket, address):
 
             if first_packet == 'FIN':
                 print('Received FIN from client')
-                send_packet(client_socket, ACK, address)
+                send_packet(client_socket, SHAKE_ACK, address)
                 print('Sent ACK for FIN to client')
                 send_packet(client_socket, FIN, address)
                 print('Sent own FIN to client')
@@ -233,7 +234,7 @@ def perform_three_way_handshake(server_socket):
 
         # Receive final ACK
         final_ack, _ = server_socket.recvfrom(1024)
-        if final_ack.decode() == ACK:
+        if final_ack.decode() == SHAKE_ACK:
             print("Received final ACK from Client")
             return True, client_addr
         else:
