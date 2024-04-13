@@ -21,24 +21,28 @@ DELAY_CLIENT_PACKET_PROBABILITY = 0.2
 DELAY_SERVER_PACKET_PROBABILITY = 0.2
 
 # Delay range in milliseconds for packets from client and server
-CLIENT_DELAY_RANGE = (4000, 8000)  # (min, max)
-SERVER_DELAY_RANGE = (4000, 8000)  # (min, max)
+CLIENT_DELAY_RANGE = (1000, 4000)  # (min, max)
+SERVER_DELAY_RANGE = (1000, 4000)  # (min, max)
 
 # Flags to enable or disable packet dropping and delaying
 PACKET_DROPPING_ENABLED = True
 PACKET_DELAYING_ENABLED = True
 
+
 def should_drop_packet(probability):
     return PACKET_DROPPING_ENABLED and random.random() < probability
 
+
 def should_delay_packet(probability):
     return PACKET_DELAYING_ENABLED and random.random() < probability
+
 
 def delay_packet(packet_type):
     min_delay, max_delay = CLIENT_DELAY_RANGE if packet_type == "client" else SERVER_DELAY_RANGE
     delay = random.randint(min_delay, max_delay) / 1000
     time.sleep(delay)
     print(f"Delayed {packet_type} packet for {delay} seconds")
+
 
 def handle_client_to_server(client_data, server_socket):
     if should_drop_packet(DROP_CLIENT_PACKET_PROBABILITY):
@@ -50,6 +54,7 @@ def handle_client_to_server(client_data, server_socket):
 
     server_socket.sendto(client_data, (SERVER_IP, SERVER_PORT))
 
+
 def handle_server_to_client(proxy_socket, client_addr, server_data):
     if should_drop_packet(DROP_SERVER_PACKET_PROBABILITY):
         print("Dropped packet from server")
@@ -60,8 +65,10 @@ def handle_server_to_client(proxy_socket, client_addr, server_data):
 
     proxy_socket.sendto(server_data, client_addr)
 
+
 def send_packet(socket, packet, address):
     socket.sendto(packet.encode(), address)
+
 
 def is_handshake_packet(data):
     """
@@ -73,7 +80,9 @@ def is_handshake_packet(data):
     Returns:
     - bool: True if the packet is part of the handshake, False otherwise.
     """
-    return data.startswith(b"SYN") or data.startswith(b"SHAKE_ACK") or data.startswith(b"SYN-ACK") or data.startswith(b"FIN") or data.startswith(b"FIN-ACK")
+    return data.startswith(b"SYN") or data.startswith(b"SHAKE_ACK") or data.startswith(b"SYN-ACK") or data.startswith(
+        b"FIN") or data.startswith(b"FIN-ACK")
+
 
 def handle_handshake_packet(packet, socket, address):
     """
@@ -86,6 +95,7 @@ def handle_handshake_packet(packet, socket, address):
     """
     socket.sendto(packet, address)
     print(f"Forwarded handshake packet to {address}: {packet}")
+
 
 def main():
     global server_socket
@@ -133,6 +143,7 @@ def main():
     finally:
         proxy_socket.close()
         server_socket.close()
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--disable-dropping":

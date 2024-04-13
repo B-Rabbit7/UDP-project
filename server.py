@@ -1,10 +1,3 @@
-
-"""
-The purpose of this server is to provide character count, word count, and character frequency analysis for the text
-data it receives over UDP (User Datagram Protocol). It listens for incoming data packets, aggregates them,
-and performs the requested analysis once all packets are received. It gracefully handles the termination signal (
-Ctrl+C) for a clean shutdown.
-"""
 import socket
 import signal
 import sys
@@ -69,6 +62,7 @@ def get_frequency_of_chars(text):
         char_dict[chr(letter)] += 1
     return char_dict
 
+
 def signal_handler(sig, frame):
     """
     Handle the SIGINT signal (Ctrl+C) to gracefully shut down the server.
@@ -82,18 +76,22 @@ def signal_handler(sig, frame):
     running = False
     sys.exit(0)
 
+
 def send_packet(socket, packet, address):
     """Send a packet to the specified address."""
     socket.sendto(packet.encode(), address)
+
 
 def receive_packet(socket):
     """Receive a packet from the socket."""
     return socket.recvfrom(1024)
 
+
 def send_syn_ack(client_socket, address):
     """Send a SYN-ACK response to the client."""
     send_packet(client_socket, SYN_ACK, address)
     print("Sent SYN-ACK to Client")
+
 
 def receive_syn(client_socket):
     """Receive a SYN request from the client."""
@@ -104,6 +102,7 @@ def receive_syn(client_socket):
     else:
         print("Failed: Received SYN response from Client")
         return False, None
+
 
 def receive_final_ack(client_socket):
     """Receive a final ACK response from the client."""
@@ -119,6 +118,7 @@ def receive_final_ack(client_socket):
         print(f"Failed: Error receiving final ACK - {e}")
         return False
 
+
 def authenticate_client(client_socket, address):
     """Authenticate the client."""
     print("Authenticating client...")
@@ -133,6 +133,7 @@ def authenticate_client(client_socket, address):
         send_packet(client_socket, NACK, address)
         print('Sent NACK for PSH to client')
         return False
+
 
 def process_data(packets):
     """
@@ -171,6 +172,7 @@ def process_data(packets):
     except UnicodeDecodeError:
         print("Data is not valid UTF-8, handle as binary or other encoding")
 
+
 def handle_client_request(client_socket, address):
     """Handle a client request."""
     while True:
@@ -196,7 +198,29 @@ def handle_client_request(client_socket, address):
                     packet_count, _ = receive_packet(client_socket)
                     packet_count = int(packet_count.decode())
                     print('Received packet count:', packet_count)
-                    packets = [receive_packet(client_socket)[0] for _ in range(packet_count)]
+                    packets = []
+
+                    # receiving data from the client
+                    for i in range(packet_count):
+                        packet, _ = receive_packet(client_socket)
+                        print(f"packet on server: {packet}")
+                        packet_number, packet_data = packet.split(b':', 1)
+                        packet_number = int(packet_number.decode())
+
+                        # If the received packet is out of order
+                        while not packet_number == i + 1:
+                            print(f"Received packet number:{packet_number} expecting {i + 1}")
+                            print(f"Sending NACK for packet with needed packet number of {i + 1}")
+                            send_packet(client_socket, str(i + 1), address)
+                            retransmitted_packet,_ = receive_packet(client_socket)
+                            packet_number, packet_data = retransmitted_packet.split(b':', 1)
+                            packet_number = int(packet_number.decode())
+                            print(f"Received packet number after NACK {packet_number}")
+
+                        # If received packet is in order
+                        packets.append(packet)
+                        send_packet(client_socket, ACK, address)  # Send ACK for each packet received
+
                     results = process_data(packets)
                     print(results)
                     send_packet(client_socket, results, address)
@@ -207,6 +231,7 @@ def handle_client_request(client_socket, address):
         except socket.error as e:
             print(e)
             break
+
 
 def perform_three_way_handshake(server_socket):
     """
@@ -244,6 +269,7 @@ def perform_three_way_handshake(server_socket):
         print(f"Failed: Error during 3-way handshake - {e}")
         return False, None
 
+
 def main():
     """
     Main function to start the server.
@@ -277,6 +303,7 @@ def main():
         except socket.error as e:
             print(e)
             running = False
+
 
 if __name__ == '__main__':
     main()

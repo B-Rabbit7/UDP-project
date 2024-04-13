@@ -1,10 +1,3 @@
-
-"""
-The purpose of this client script is to read a text file specified by the user and send its contents over a UDP
-connection to a server for analysis. It calculates the number of packets needed to transmit the file's data based on
-a predefined buffer size. The client then sends each packet sequentially, along with a special "END" packet to signal
-the completion of file transmission, and waits for the server's response containing the analysis results.
-"""
 import socket
 import sys
 import os
@@ -21,6 +14,9 @@ SHAKE_ACK = "SHAKE_ACK"
 PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8888
 TIME_OUT = 4
+
+global packet_number, packet_with_number
+
 
 def handle_file(filename):
     """Open and validate the specified file."""
@@ -43,6 +39,7 @@ def handle_file(filename):
         print(f"Error: {error}")
         return None
 
+
 def get_packet_count(filename, buffer_size):
     """Calculate the number of packets needed to transmit the file's data."""
     byte_size = os.stat(filename).st_size
@@ -51,10 +48,12 @@ def get_packet_count(filename, buffer_size):
         packet_count += 1
     return packet_count
 
+
 def send_syn(server_socket, udp_ip, udp_port):
     """Send SYN signal to server."""
     server_socket.sendto(SYN.encode(), (udp_ip, udp_port))
     print("Sent SYN")
+
 
 def receive_syn_ack(server_socket):
     """Receive SYN-ACK signal from server."""
@@ -66,20 +65,24 @@ def receive_syn_ack(server_socket):
         print("Failed: Received invalid SYN-ACK from server")
         return False
 
+
 def send_psh(server_socket, udp_ip, udp_port):
     """Send PSH signal to server."""
     server_socket.sendto(PSH.encode(), (udp_ip, udp_port))
     print("Sent PSH")
+
 
 def send_final_ack(server_socket, udp_ip, udp_port):
     """Send final ACK signal to server."""
     server_socket.sendto(FIN_ACK.encode(), (udp_ip, udp_port))
     print("Sent final ACK")
 
+
 def send_fin(server_socket, udp_ip, udp_port):
     """Send FIN signal to server."""
     server_socket.sendto(FIN.encode(), (udp_ip, udp_port))
     print("Sent FIN")
+
 
 def receive_fin_ack(server_socket):
     """Receive FIN-ACK signal from server."""
@@ -89,6 +92,7 @@ def receive_fin_ack(server_socket):
     else:
         return False
 
+
 def receive_fin(server_socket):
     """Receive FIN signal from server."""
     fin, addr = server_socket.recvfrom(1024)
@@ -97,14 +101,48 @@ def receive_fin(server_socket):
     else:
         return False
 
+
 def send_file_data(client_socket, udp_ip, udp_port, file_descriptor, packet_count, buffer_size):
     """Send file data over the UDP connection."""
-    for i in range(packet_count):
-        packet_number = i + 1 
+    global packet_number, packet_with_number
+    base = 0
+    packets_sent = {}
+
+    # Loop until all packets are sent and acknowledged
+    while base < packet_count:
+        # Send the next packet if it's within the range of packet count
+        packet_number = base + 1
         packet_data = file_descriptor.read(buffer_size)
-        packet_with_number = f"{packet_number}:{packet_data}" 
+        packet_with_number = f"{packet_number}:{packet_data}"
         client_socket.sendto(packet_with_number.encode(), (udp_ip, udp_port))
-        time.sleep(0.0001)
+        print(f"Sent packet {packet_number}")
+        packets_sent[packet_number] = packet_data
+
+        while True:
+            # Check for acknowledgment
+            try:
+                client_socket.settimeout(TIME_OUT)
+                ack, _ = client_socket.recvfrom(1024)
+                ack_signal = ack.decode()
+                print(f"Received ACK: {ack_signal}")
+
+                # If server sends ACK
+                if ack_signal == ACK:
+                    print(f"Received ACK for {packet_number}")
+                    break
+
+                # If server sends int
+                elif int(ack_signal) in packets_sent.keys():
+                    print(f"Server requested packet number: {int(ack_signal)}")
+                    packet_with_number = f"{int(ack_signal)}:{packets_sent[int(ack_signal)]}"
+                    client_socket.sendto(packet_with_number.encode(), (udp_ip, udp_port))
+            except socket.timeout:
+                print(f"Timeout: Retransmitting packet {packet_with_number}")
+                client_socket.sendto(packet_with_number.encode(), (udp_ip, udp_port))
+                print(f"Retransmitted packet {packet_number}")
+        base += 1
+    print(f"All packets sent")
+
 
 def three_way_handshake(client_socket, udp_ip, udp_port):
     """Perform the 3-way handshake."""
@@ -117,6 +155,7 @@ def three_way_handshake(client_socket, udp_ip, udp_port):
         print("Handshake failed. Closing connection.")
         client_socket.close()
         return False
+
 
 def four_way_handshake(client_socket, udp_ip, udp_port):
     """Perform the 4-way handshake."""
@@ -140,6 +179,7 @@ def four_way_handshake(client_socket, udp_ip, udp_port):
         client_socket.close()
         return False
 
+
 def authenticate(client_socket):
     """Authenticate the client."""
     authenticated = client_socket.recvfrom(1024)
@@ -150,21 +190,18 @@ def authenticate(client_socket):
         print("Client authentication failed")
         return False
 
+
 def main():
     if len(sys.argv) != 4:
         print("Error: Please provide exactly 3 arguments (the path to the text file).")
         sys.exit(1)
 
     udp_ip = sys.argv[1]
-    udp_port = int(sys.argv[2]) # PROXY_PORT
+    udp_port = int(sys.argv[2])  # PROXY_PORT
     filename = sys.argv[3]
 
     ip_version = socket.AF_INET if ':' not in udp_ip else socket.AF_INET6
     client_socket = socket.socket(ip_version, socket.SOCK_DGRAM)
-
-    # Set default time-out
-    client_socket.settimeout(TIME_OUT)
-    print(f'Client default timeout: {TIME_OUT}s')
 
     # Initiating file descriptor
     file_descriptor = handle_file(filename)
@@ -206,10 +243,10 @@ def main():
                         client_socket.close()
                 else:
                     print("Client could not be authenticated")
-                    client_socket.settimeout(TIME_OUT)
                     client_socket.close()
     except socket.error as error:
         print(f"Error: {error}")
+
 
 if __name__ == "__main__":
     main()
