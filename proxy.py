@@ -13,8 +13,8 @@ SERVER_IP = "127.0.0.1"
 SERVER_PORT = 8889
 
 # Probability of dropping packets from client and server
-DROP_CLIENT_PACKET_PROBABILITY = 0.2
-DROP_SERVER_PACKET_PROBABILITY = 0.2
+DROP_CLIENT_PACKET_PROBABILITY = 0.4
+DROP_SERVER_PACKET_PROBABILITY = 0.4
 
 # Probability of delaying packets from client and server
 DELAY_CLIENT_PACKET_PROBABILITY = 0.2
