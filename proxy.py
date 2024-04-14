@@ -23,9 +23,9 @@ DROP_SERVER_PACKET_PROBABILITY = 0.2
 DELAY_CLIENT_PACKET_PROBABILITY = 0.2
 DELAY_SERVER_PACKET_PROBABILITY = 0.2
 
-# Delay range in milliseconds for packets from client and server
-CLIENT_DELAY_RANGE = (1000, 4000)  # (min, max)
-SERVER_DELAY_RANGE = (1000, 4000)  # (min, max)
+# Delay range in milliseconds for packets from client and server (min, max)
+CLIENT_DELAY_RANGE = (1000, 4000)
+SERVER_DELAY_RANGE = (1000, 4000)
 
 # Flags to enable or disable packet dropping, delaying, and graphing
 PACKET_DROPPING_ENABLED = True
@@ -33,26 +33,51 @@ PACKET_DELAYING_ENABLED = True
 GRAPH_ENABLED = True
 
 # Lists to store data for plotting
-client_packets = []
-server_packets = []
+client_sent_packets = []
+server_sent_packets = []
+client_received_packets = []
+server_received_packets = []
 time_points = []
-client_times = []
-server_times = []
+client_sent_times = []
+server_sent_times = []
+client_received_times = []
+server_received_times = []
 
-# Function to update the plot
 def update_plot():
     while True:
         time.sleep(1)
         if GRAPH_ENABLED:
-            time_points.append(datetime.datetime.now())
-            client_packets.append(sum(1 for t in client_times if t > time_points[-1] - datetime.timedelta(seconds=1)))
-            server_packets.append(sum(1 for t in server_times if t > time_points[-1] - datetime.timedelta(seconds=1)))
-            plt.clf()  # Clear the current plot
-            plt.plot(time_points, client_packets, label='Client Packets')
-            plt.plot(time_points, server_packets, label='Server Packets')
+            current_time = datetime.datetime.now()
+            time_points.append(current_time)
+
+            client_sent_count = sum(1 for t in client_sent_times if t > current_time - datetime.timedelta(seconds=1))
+            server_sent_count = sum(1 for t in server_sent_times if t > current_time - datetime.timedelta(seconds=1))
+            client_received_count = sum(1 for t in client_received_times if t > current_time - datetime.timedelta(seconds=1))
+            server_received_count = sum(1 for t in server_received_times if t > current_time - datetime.timedelta(seconds=1))
+
+            client_sent_packets.append(client_sent_count)
+            server_sent_packets.append(server_sent_count)
+            client_received_packets.append(client_received_count)
+            server_received_packets.append(server_received_count)
+
+            plt.figure(1)
+            plt.clf()
+            plt.plot(time_points, client_sent_packets, label='Client Sent Packets', color='blue')
+            plt.plot(time_points, server_sent_packets, label='Server Sent Packets', color='green')
             plt.xlabel('Time')
             plt.ylabel('Packets')
             plt.legend()
+            plt.title('Sent Packets')
+
+            plt.figure(2)
+            plt.clf()
+            plt.plot(time_points, client_received_packets, label='Client Received Packets', linestyle='dashed', color='orange')
+            plt.plot(time_points, server_received_packets, label='Server Received Packets', linestyle='dashed', color='red')
+            plt.xlabel('Time')
+            plt.ylabel('Packets')
+            plt.legend()
+            plt.title('Received Packets')
+
             plt.pause(0.01)
 
 # Thread to update the plot
@@ -81,7 +106,7 @@ def handle_client_to_server(client_data, server_socket):
         delay_packet("client")
 
     server_socket.sendto(client_data, (SERVER_IP, SERVER_PORT))
-    client_times.append(datetime.datetime.now()) 
+    client_sent_times.append(datetime.datetime.now()) 
 
 def handle_server_to_client(proxy_socket, client_addr, server_data):
     if should_drop_packet(DROP_SERVER_PACKET_PROBABILITY):
@@ -92,21 +117,19 @@ def handle_server_to_client(proxy_socket, client_addr, server_data):
         delay_packet("server")
 
     proxy_socket.sendto(server_data, client_addr)
-    server_times.append(datetime.datetime.now())
+    server_sent_times.append(datetime.datetime.now())
 
 def send_packet(socket, packet, address):
     socket.sendto(packet.encode(), address)
 
 def is_handshake_packet(data):
-    return data.startswith(b"SYN") or data.startswith(b"SHAKE_ACK") or data.startswith(b"SYN-ACK") or data.startswith(
-        b"FIN") or data.startswith(b"FIN-ACK")
+    return data.startswith(b"SYN") or data.startswith(b"SHAKE_ACK") or data.startswith(b"SYN-ACK") or data.startswith(b"FIN") or data.startswith(b"FIN-ACK")
 
 def handle_handshake_packet(packet, socket, address):
     socket.sendto(packet, address)
     print(f"Forwarded handshake packet to {address}: {packet}")
 
 def main():
-
     # Create proxy socket
     proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     proxy_socket.bind((PROXY_IP, PROXY_PORT))
@@ -132,6 +155,7 @@ def main():
                         handle_handshake_packet(client_data, server_socket, (SERVER_IP, SERVER_PORT))
                     else:
                         handle_client_to_server(client_data, server_socket)
+                    client_received_times.append(datetime.datetime.now())  
 
                 elif ready_socket == server_socket:
                     # Packet received from server
@@ -143,7 +167,7 @@ def main():
                         handle_handshake_packet(server_data, proxy_socket, client_addr)
                     else:
                         handle_server_to_client(proxy_socket, client_addr, server_data)
-                        print(f"Proxy sent to client: {server_data}")
+                    server_received_times.append(datetime.datetime.now())  
 
     except KeyboardInterrupt:
         print("Proxy shutting down...")
