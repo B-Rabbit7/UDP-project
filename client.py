@@ -228,7 +228,22 @@ def main():
                     print("Sending packet size")
                     client_socket.sendto(str(packet_count).encode(), (udp_ip, udp_port))
                     print("Sending %s with %d packets" % (filename, packet_count))
-                    time.sleep(0.0001)
+
+                    # Loop until ACK for packet count is received
+                    while True:
+                        try:
+                            client_socket.settimeout(TIME_OUT)
+                            ack, _ = client_socket.recvfrom(1024)
+                            ack_signal = ack.decode()
+                            if ack_signal == ACK:
+                                print("Received ACK for packet count")
+                                break
+                            else:
+                                print(f"Received unexpected signal: {ack_signal}")
+                        except socket.timeout:
+                            print("Timeout: Resending packet count")
+                            client_socket.sendto(str(packet_count).encode(), (udp_ip, udp_port))
+
 
                     # Sending file data
                     send_file_data(client_socket, udp_ip, udp_port, file_descriptor, packet_count, buffer_size)

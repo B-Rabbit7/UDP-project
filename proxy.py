@@ -53,6 +53,7 @@ def handle_client_to_server(client_data, server_socket):
         delay_packet("client")
 
     server_socket.sendto(client_data, (SERVER_IP, SERVER_PORT))
+    print(f"Proxy sent to server: {client_data}")
 
 
 def handle_server_to_client(proxy_socket, client_addr, server_data):
@@ -64,6 +65,7 @@ def handle_server_to_client(proxy_socket, client_addr, server_data):
         delay_packet("server")
 
     proxy_socket.sendto(server_data, client_addr)
+    print(f"Proxy sent to client: {server_data}")
 
 
 def send_packet(socket, packet, address):
@@ -71,28 +73,11 @@ def send_packet(socket, packet, address):
 
 
 def is_handshake_packet(data):
-    """
-    Check if the packet is part of the 3-way or 4-way handshake.
-    
-    Parameters:
-    - data (bytes): The packet data.
-    
-    Returns:
-    - bool: True if the packet is part of the handshake, False otherwise.
-    """
     return data.startswith(b"SYN") or data.startswith(b"SHAKE_ACK") or data.startswith(b"SYN-ACK") or data.startswith(
-        b"FIN") or data.startswith(b"FIN-ACK")
+        b"FIN") or data.startswith(b"FIN-ACK") or data.startswith(b"PSH")
 
 
 def handle_handshake_packet(packet, socket, address):
-    """
-    Handle a handshake packet without delaying or dropping.
-    
-    Parameters:
-    - packet (bytes): The handshake packet data.
-    - socket (socket): The socket to send the packet to (server or client).
-    - address (tuple): The address of the recipient (client or server).
-    """
     socket.sendto(packet, address)
     print(f"Forwarded handshake packet to {address}: {packet}")
 
@@ -100,13 +85,13 @@ def handle_handshake_packet(packet, socket, address):
 def main():
     global server_socket
 
-    # Create proxy socket
+    # Create proxy sckt
     proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     proxy_socket.bind((PROXY_IP, PROXY_PORT))
 
     print("Proxy is listening...")
 
-    # Create server socket
+    # Create server sckt
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     try:
@@ -136,7 +121,6 @@ def main():
                         handle_handshake_packet(server_data, proxy_socket, client_addr)
                     else:
                         handle_server_to_client(proxy_socket, client_addr, server_data)
-                        print(f"Proxy sent to client: {server_data}")
 
     except KeyboardInterrupt:
         print("Proxy shutting down...")
