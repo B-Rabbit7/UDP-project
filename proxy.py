@@ -44,16 +44,16 @@ client_received_times = []
 server_received_times = []
 
 def update_plot():
+    seconds_counter = 1  # Initialize the counter for seconds
     while True:
         time.sleep(1)
         if GRAPH_ENABLED:
             current_time = datetime.datetime.now()
-            time_points.append(current_time)
-
-            client_sent_count = sum(1 for t in client_sent_times if t > current_time - datetime.timedelta(seconds=1))
-            server_sent_count = sum(1 for t in server_sent_times if t > current_time - datetime.timedelta(seconds=1))
-            client_received_count = sum(1 for t in client_received_times if t > current_time - datetime.timedelta(seconds=1))
-            server_received_count = sum(1 for t in server_received_times if t > current_time - datetime.timedelta(seconds=1))
+            # Calculate the number of packets sent and received by the client and server in the last second
+            client_sent_count = sum(1 for sent_time in client_sent_times if sent_time > current_time - datetime.timedelta(seconds=1))
+            server_sent_count = sum(1 for sent_time in server_sent_times if sent_time > current_time - datetime.timedelta(seconds=1))
+            client_received_count = sum(1 for received_time in client_received_times if received_time > current_time - datetime.timedelta(seconds=1))
+            server_received_count = sum(1 for received_time in server_received_times if received_time > current_time - datetime.timedelta(seconds=1))
 
             client_sent_packets.append(client_sent_count)
             server_sent_packets.append(server_sent_count)
@@ -62,23 +62,25 @@ def update_plot():
 
             plt.figure(1)
             plt.clf()
-            plt.plot(time_points, client_sent_packets, label='Client Sent Packets', color='blue')
-            plt.plot(time_points, server_sent_packets, label='Server Sent Packets', color='green')
-            plt.xlabel('Time')
+            plt.plot(range(1, seconds_counter + 1), client_sent_packets, label='Client Sent Packets', color='blue')
+            plt.plot(range(1, seconds_counter + 1), server_sent_packets, label='Server Sent Packets', color='green')
+            plt.xlabel('Time (seconds)')
             plt.ylabel('Packets')
-            plt.legend()
-            plt.title('Sent Packets')
+            plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.09), ncol=2)
+            plt.title('Sent Packets for Client and Server', y=1.08)
 
             plt.figure(2)
             plt.clf()
-            plt.plot(time_points, client_received_packets, label='Client Received Packets', linestyle='dashed', color='orange')
-            plt.plot(time_points, server_received_packets, label='Server Received Packets', linestyle='dashed', color='red')
-            plt.xlabel('Time')
+            plt.plot(range(1, seconds_counter + 1), client_received_packets, label='Client Received Packets', linestyle='dashed', color='orange')
+            plt.plot(range(1, seconds_counter + 1), server_received_packets, label='Server Received Packets', linestyle='dashed', color='red')
+            plt.xlabel('Time (seconds)')
             plt.ylabel('Packets')
-            plt.legend()
-            plt.title('Received Packets')
+            plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.09), ncol=2)
+            plt.title('Received Packets for Client and Server', y=1.08)
 
+            seconds_counter += 1
             plt.pause(0.01)
+
 
 # Thread to update the plot
 plot_thread = threading.Thread(target=update_plot)
