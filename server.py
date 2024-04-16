@@ -222,7 +222,6 @@ def handle_client_request(client_socket, address):
                                     # Process out-of-order packets
                                     out_of_order_packet = packet_with_sequence.pop(packet_with_sequence.index(str(expected_packet_number)))
                                     packets.append(out_of_order_packet)
-                                    send_packet(client_socket, ACK, address)  # Send ACK for each out-of-order packet received
                                     expected_packet_number += 1
 
                             elif packet_number > expected_packet_number:
@@ -232,7 +231,6 @@ def handle_client_request(client_socket, address):
 
                             else:
                                 # If the received packet is a duplicate, send ACK for it again
-                                send_packet(client_socket, ACK, address)  # Send ACK for each duplicate packet received
                                 print(f"Received duplicate packet: {packet_number}")
 
                         except socket.timeout:
