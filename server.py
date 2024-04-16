@@ -17,6 +17,8 @@ PROXY_PORT = 8889
 running = True
 clients = set()  # Set of verified clients
 TIME_OUT = 4
+global packet_number, packet_count
+
 
 def get_character_count(text):
     return len(text)
@@ -170,7 +172,6 @@ def reorder_dict(dictionary):
 
 
 def handle_client_request(client_socket, address):
-    global packet_number, packet_count
     while True:
         try:
             print('Waiting for client request')
@@ -202,53 +203,43 @@ def handle_client_request(client_socket, address):
                     print('Sent ACK for packet count')
 
                     # receiving data from the client
-                    expected_packet_number = 1
-                    while expected_packet_number <= packet_count:
-                        try:
-                            client_socket.settimeout(TIME_OUT)
-                            packet, _ = receive_packet(client_socket)
-                            packet_number, packet_data = packet.split(b':', 1)
-                            packet_number = int(packet_number.decode())
-                            print(f"Received packet number: {packet_number}")
+                    for i in range(packet_count):
+                        while True:
+                            try:
+                                client_socket.settimeout(TIME_OUT)
+                                packet, _ = receive_packet(client_socket)
+                                packet_number, packet_data = packet.split(b':', 1)
+                                packet_number = int(packet_number.decode())
+                                print(f"Received packet number: {packet_number}")
+                                packet_with_sequence.append(packet)
+                                
+                                # If the received packet is out of order
+                                while not packet_number == i + 1:
+                                    print(f"Received packet number:{packet_number} expecting {i + 1}")
+                                    print(f"Sending NACK for packet with needed packet number of {i + 1}")
+                                    send_packet(client_socket, str(i + 1), address)
+                                    retransmitted_packet, _ = receive_packet(client_socket)
+                                    packet_number, packet_data = retransmitted_packet.split(b':', 1)
+                                    packet_number = int(packet_number.decode())
+                                    packet_with_sequence.append(retransmitted_packet)
+                                    print(f"Received packet number after NACK {packet_number}")
 
-                            if packet_number == expected_packet_number:
                                 # If received packet is in order
                                 packets.append(packet)
                                 send_packet(client_socket, ACK, address)  # Send ACK for each packet received
-                                expected_packet_number += 1
-                                
-                                # Check if there are any out-of-order packets in the buffer
-                                while str(expected_packet_number) in packet_with_sequence:
-                                    # Process out-of-order packets
-                                    out_of_order_packet = packet_with_sequence.pop(packet_with_sequence.index(str(expected_packet_number)))
-                                    packets.append(out_of_order_packet)
-                                    expected_packet_number += 1
+                                break
+                            # Timeout and no packet sent that met criteria
+                            except socket.timeout:
+                                print(f"Retransmitting packet {packet_number}")
 
-                            elif packet_number > expected_packet_number:
-                                # If the received packet is out of order, store it in the buffer
-                                packet_with_sequence.append(str(packet_number))
-                                print(f"Received out-of-order packet: {packet_number}, expecting: {expected_packet_number}")
-
-                            else:
-                                # If the received packet is a duplicate, send ACK for it again
-                                print(f"Received duplicate packet: {packet_number}")
-
-                        except socket.timeout:
-                            print(f"Timeout: Retransmitting packet {expected_packet_number}")
-
-                    # Process any remaining out-of-order packets in the buffer
-                    for packet_number in packet_with_sequence:
-                        packet = receive_packet(client_socket)
-                        packets.append(packet)
-                        send_packet(client_socket, ACK, address)  # Send ACK for each out-of-order packet received
-
-                    # Process all packets in order
-                    unique_packets = find_duplicates_and_unique(packets)
+                    unique_packets = find_duplicates_and_unique(packet_with_sequence)
                     result_dict = list_to_dict(unique_packets)
                     new_dict = reorder_dict(result_dict)
                     results = process_data(new_dict)
                     send_packet(client_socket, results, address)
 
+
+                ## else of the if
                 else:
                     break
             else:
