@@ -114,7 +114,6 @@ def update_plot():
             plt.xticks(x, labels)
             plt.legend()
 
-            # Include the total retransmission count for client and server as a bar graph
             plt.figure(4)
             plt.clf()
             total_retransmissions = [client_retransmissions, server_retransmissions]
@@ -218,21 +217,17 @@ def main():
 
     print("Proxy is listening...")
 
-    # Create server sckt
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     try:
         while True:
-            # Listen for packets from both client and server simultaneously
             ready_sockets, _, _ = select.select([proxy_socket, server_socket], [], [])
 
             for ready_socket in ready_sockets:
                 if ready_socket == proxy_socket:
-                    # Packet received from client
                     client_data, client_addr = proxy_socket.recvfrom(1024)
                     print(f"Received data from client: {client_data}")
 
-                    # Forward packet to server
                     if is_handshake_packet(client_data):
                         handle_handshake_packet(client_data, server_socket, (SERVER_IP, SERVER_PORT))
                     else:
@@ -240,11 +235,9 @@ def main():
                     client_received_times.append(datetime.datetime.now())
 
                 elif ready_socket == server_socket:
-                    # Packet received from server
                     server_data, server_addr = server_socket.recvfrom(1024)
                     print(f"Received data from server: {server_data}")
 
-                    # Forward packet to client
                     if is_handshake_packet(server_data):
                         handle_handshake_packet(server_data, proxy_socket, client_addr)
                     else:

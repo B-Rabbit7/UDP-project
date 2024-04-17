@@ -18,7 +18,7 @@ PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8889
 
 running = True
-clients = set()  # Set of verified clients
+clients = set()
 TIME_OUT = 5
 global packet_number, packet_count
 
@@ -142,8 +142,8 @@ def find_duplicates_and_unique(lst):
             seen.add(key)
 
     if duplicates:
-        print("Duplicates:", end=" ")  # Print without newline
-        print(", ".join(d.decode() for d in duplicates))  # Print duplicates separated by comma
+        print("Duplicates:", end=" ")
+        print(", ".join(d.decode() for d in duplicates))
         print("Dropping duplicates...")
         time.sleep(0.005)
     else:
@@ -203,11 +203,9 @@ def handle_client_request(client_socket, address):
                     packet_with_sequence = []
                     packet_numbers = set()
 
-                    # Send acknowledgment for the packet count
                     send_packet(client_socket, COUNT_ACK, address)
                     print('Sent ACK for packet count')
 
-                    # receiving data from the client
                     for i in range(packet_count):
                         while True:
                             try:
@@ -217,14 +215,11 @@ def handle_client_request(client_socket, address):
                                 packet_number = int(packet_number.decode())
                                 print(f"Received packet number: {packet_number}")
                                 packet_with_sequence.append(packet)
-                                # If dupe
                                 if packet_number in packet_numbers:
-                                    # Duplicate packet received, retransmit ACK for expected packet
                                     print(f"Received duplicate packet {packet_number}")
                                     send_packet(client_socket, ACK, address)
-                                    continue  # Skip processing this duplicate packet
+                                    continue  
 
-                                # If the received packet is out of order
                                 while not packet_number == i + 1:
                                     print(f"Received packet number:{packet_number} expecting {i + 1}")
                                     print(f"Sending NACK for packet with needed packet number of {i + 1}")
@@ -235,12 +230,11 @@ def handle_client_request(client_socket, address):
                                     packet_with_sequence.append(retransmitted_packet)
                                     print(f"Received packet number after NACK {packet_number}")
 
-                                # If received packet is in order
                                 packets.append(packet)
                                 packet_numbers.add(packet_number)
-                                send_packet(client_socket, ACK, address)  # Send ACK for each packet received
+                                send_packet(client_socket, ACK, address) 
                                 break
-                            # Timeout and no packet sent that met criteria
+
                             except socket.timeout:
                                 print(f"Timed out waiting for ACK")
 
@@ -289,7 +283,6 @@ def main():
     global running
     running = True
 
-    # set up sckt and SIGINT
     ip_version = socket.AF_INET if ':' not in PROXY_IP else socket.AF_INET6
     server_socket = socket.socket(ip_version, socket.SOCK_DGRAM)
     server_socket.bind((PROXY_IP, PROXY_PORT))
