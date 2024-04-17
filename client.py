@@ -11,9 +11,13 @@ FIN = "FIN"
 PSH = "PSH"
 FIN_ACK = "FIN-ACK"
 SHAKE_ACK = "SHAKE_ACK"
+PSH_ACK = "PSH_ACK"
+COUNT_ACK = "COUNT_ACK"
+ACK_REQUESTED = "ACK_REQUESTED"
+
 PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8888
-TIME_OUT = 4
+TIME_OUT = 5
 
 global packet_number, packet_with_number
 
@@ -136,10 +140,12 @@ def send_file_data(client_socket, udp_ip, udp_port, file_descriptor, packet_coun
                     print(f"Server requested packet number: {int(ack_signal)}")
                     packet_with_number = f"{int(ack_signal)}:{packets_sent[int(ack_signal)]}"
                     client_socket.sendto(packet_with_number.encode(), (udp_ip, udp_port))
+                    print(f"Resent packet {int(ack_signal)}")
+
             except socket.timeout:
-                print(f"Timeout: Retransmitting packet {packet_with_number}")
                 client_socket.sendto(packet_with_number.encode(), (udp_ip, udp_port))
                 print(f"Retransmitted packet {packet_number}")
+
         base += 1
     print(f"All packets sent")
 
@@ -183,7 +189,7 @@ def four_way_handshake(client_socket, udp_ip, udp_port):
 def authenticate(client_socket):
     """Authenticate the client."""
     authenticated = client_socket.recvfrom(1024)
-    if authenticated[0] == ACK.encode():
+    if authenticated[0] == PSH_ACK.encode():
         print("Client authenticated")
         return True
     else:
@@ -235,7 +241,7 @@ def main():
                             client_socket.settimeout(TIME_OUT)
                             ack, _ = client_socket.recvfrom(1024)
                             ack_signal = ack.decode()
-                            if ack_signal == ACK:
+                            if ack_signal == COUNT_ACK:
                                 print("Received ACK for packet count")
                                 break
                             else:
@@ -244,12 +250,10 @@ def main():
                             print("Timeout: Resending packet count")
                             client_socket.sendto(str(packet_count).encode(), (udp_ip, udp_port))
 
-
                     # Sending file data
                     send_file_data(client_socket, udp_ip, udp_port, file_descriptor, packet_count, buffer_size)
-
-                    # Print results
                     results, addr = client_socket.recvfrom(1024)
+
                     print(results.decode())
 
                     # Start 4-way handshake

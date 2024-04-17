@@ -10,13 +10,16 @@ FIN = "FIN"
 FIN_ACK = "FIN-ACK"
 NACK = "NACK"
 SHAKE_ACK = "SHAKE_ACK"
+PSH_ACK = "PSH_ACK"
+COUNT_ACK = "COUNT_ACK"
+ACK_REQUESTED = "ACK_REQUESTED"
 
 PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8889
 
 running = True
 clients = set()  # Set of verified clients
-TIME_OUT = 4
+TIME_OUT = 5
 global packet_number, packet_count
 
 
@@ -87,7 +90,7 @@ def authenticate_client(client_socket, address):
     time.sleep(0.5)
     if address in clients:
         print("Client authenticated")
-        send_packet(client_socket, ACK, address)
+        send_packet(client_socket, PSH_ACK, address)
         print('Sent ACK for PSH to client')
         return True
     else:
@@ -172,6 +175,7 @@ def reorder_dict(dictionary):
 
 
 def handle_client_request(client_socket, address):
+    global packet_number
     while True:
         try:
             print('Waiting for client request')
@@ -192,14 +196,16 @@ def handle_client_request(client_socket, address):
             elif first_packet == 'PSH':
                 print("Received PSH from client")
                 if authenticate_client(client_socket, address):
+                    global packet_count
                     packet_count, _ = receive_packet(client_socket)
                     packet_count = int(packet_count.decode())
                     print('Received packet count:', packet_count)
                     packets = []
                     packet_with_sequence = []
+                    packet_numbers = set()
 
                     # Send acknowledgment for the packet count
-                    send_packet(client_socket, ACK, address)
+                    send_packet(client_socket, COUNT_ACK, address)
                     print('Sent ACK for packet count')
 
                     # receiving data from the client
@@ -212,7 +218,13 @@ def handle_client_request(client_socket, address):
                                 packet_number = int(packet_number.decode())
                                 print(f"Received packet number: {packet_number}")
                                 packet_with_sequence.append(packet)
-                                
+                                # If dupe
+                                if packet_number in packet_numbers:
+                                    # Duplicate packet received, retransmit ACK for expected packet
+                                    print(f"Received duplicate packet {packet_number}")
+                                    send_packet(client_socket, ACK, address)
+                                    continue  # Skip processing this duplicate packet
+
                                 # If the received packet is out of order
                                 while not packet_number == i + 1:
                                     print(f"Received packet number:{packet_number} expecting {i + 1}")
@@ -226,20 +238,19 @@ def handle_client_request(client_socket, address):
 
                                 # If received packet is in order
                                 packets.append(packet)
+                                packet_numbers.add(packet_number)
                                 send_packet(client_socket, ACK, address)  # Send ACK for each packet received
                                 break
                             # Timeout and no packet sent that met criteria
                             except socket.timeout:
-                                print(f"Retransmitting packet {packet_number}")
+                                print(f"Timed out waiting for ACK for packet number")
 
                     unique_packets = find_duplicates_and_unique(packet_with_sequence)
                     result_dict = list_to_dict(unique_packets)
                     new_dict = reorder_dict(result_dict)
                     results = process_data(new_dict)
-                    send_packet(client_socket, results, address)
-
-
-                ## else of the if
+                    print(f"Sending results to client")
+                    send_packet(client_socket, "RESULT"+results, address)
                 else:
                     break
             else:
@@ -288,9 +299,8 @@ def main():
 
     # Server loop
     while running:
+        print("Server is listening for incoming connections...")
         try:
-            print("Server is listening for incoming connections...")
-
             handshake_success, client_addr = perform_three_way_handshake(server_socket)
             if handshake_success:
                 print(f"Connection established with client {client_addr}")
@@ -298,7 +308,6 @@ def main():
                 print(f'Client {client_addr} added to verified client list')
                 handle_client_request(server_socket, client_addr)
                 print("Connection with client ended.")
-
         except socket.error as e:
             print(e)
             running = False
