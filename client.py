@@ -17,7 +17,7 @@ ACK_REQUESTED = "ACK_REQUESTED"
 
 PROXY_IP = "127.0.0.1"
 PROXY_PORT = 8888
-TIME_OUT = 5
+TIME_OUT = 6
 
 global packet_number, packet_with_number
 

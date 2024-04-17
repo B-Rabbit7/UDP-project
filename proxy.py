@@ -6,6 +6,7 @@ import time
 import matplotlib.pyplot as plt
 import threading
 import datetime
+import numpy as np
 
 # Proxy configuration
 PROXY_IP = "127.0.0.1"
@@ -43,9 +44,19 @@ server_sent_times = []
 client_received_times = []
 server_received_times = []
 
+# Track sequence numbers received from the client
+client_sequence_numbers = set()
+
+# Track acknowledgment numbers received from the server
+server_acknowledgment_numbers = set()
+
+# Track retransmissions for client and server
+client_retransmissions = 0
+server_retransmissions = 0
+
 
 def update_plot():
-    seconds_counter = 1  # Initialize the counter for seconds
+    seconds_counter = 1 
     while True:
         time.sleep(1)
         if GRAPH_ENABLED:
@@ -85,6 +96,35 @@ def update_plot():
             plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.09), ncol=2)
             plt.title('Received Packets for Client and Server', y=1.08)
 
+            plt.figure(3)
+            plt.clf()
+            total_packets_sent = [sum(client_sent_packets), sum(server_sent_packets)]
+            total_packets_received = [sum(client_received_packets), sum(server_received_packets)]
+
+            labels = ['Client', 'Server']
+            x = np.arange(len(labels))
+            width = 0.35
+
+            plt.bar(x - width/2, total_packets_sent, width, label='Sent', color='blue')
+            plt.bar(x + width/2, total_packets_received, width, label='Received', color='green')
+
+            plt.xlabel('Source')
+            plt.ylabel('Total Packets')
+            plt.title('Total Packets Sent and Received')
+            plt.xticks(x, labels)
+            plt.legend()
+
+            # Include the total retransmission count for client and server as a bar graph
+            plt.figure(4)
+            plt.clf()
+            total_retransmissions = [client_retransmissions, server_retransmissions]
+            plt.bar(labels, total_retransmissions, color=['purple', 'orange'])
+            plt.xlabel('Source')
+            plt.ylabel('Total Retransmissions')
+            plt.title('Total Retransmissions for Client and Server')
+
+            plt.pause(0.01)
+
             seconds_counter += 1
             plt.pause(0.01)
 
@@ -102,6 +142,12 @@ def should_drop_packet(probability):
 def should_delay_packet(probability):
     return PACKET_DELAYING_ENABLED and random.random() < probability
 
+def extract_sequence_number(packet):
+    return int(packet.split(b':')[0])
+
+def extract_ack_number(packet):
+    return packet.decode()
+
 
 def delay_packet(packet_type):
     min_delay, max_delay = CLIENT_DELAY_RANGE if packet_type == "client" else SERVER_DELAY_RANGE
@@ -111,6 +157,13 @@ def delay_packet(packet_type):
 
 
 def handle_client_to_server(client_data, server_socket):
+    global client_retransmissions
+    sequence_number = extract_sequence_number(client_data)
+    if sequence_number in client_sequence_numbers:
+        client_retransmissions += 1
+    else:
+        client_sequence_numbers.add(sequence_number)
+    # Other handling code...
     if should_drop_packet(DROP_CLIENT_PACKET_PROBABILITY):
         print("Dropped packet from client")
         return
@@ -122,8 +175,13 @@ def handle_client_to_server(client_data, server_socket):
     print(f"Proxy sent to server: {client_data}")
     client_sent_times.append(datetime.datetime.now())
 
-
 def handle_server_to_client(proxy_socket, client_addr, server_data):
+    global server_retransmissions
+    acknowledgment_number = extract_ack_number(server_data)
+    if acknowledgment_number in server_acknowledgment_numbers:
+        server_retransmissions += 1
+    else:
+        server_acknowledgment_numbers.add(acknowledgment_number)
     if should_drop_packet(DROP_SERVER_PACKET_PROBABILITY):
         print("Dropped packet from server")
         return
@@ -134,7 +192,6 @@ def handle_server_to_client(proxy_socket, client_addr, server_data):
     proxy_socket.sendto(server_data, client_addr)
     print(f"Proxy sent to client: {server_data}")
     server_sent_times.append(datetime.datetime.now())
-
 
 def send_packet(socket, packet, address):
     socket.sendto(packet.encode(), address)
