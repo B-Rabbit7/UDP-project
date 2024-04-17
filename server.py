@@ -189,7 +189,6 @@ def handle_client_request(client_socket, address):
                 send_packet(client_socket, FIN, address)
                 print('Sent own FIN to client')
                 if receive_final_ack(client_socket):
-                    print('Received final ACK from client')
                     break
                 else:
                     print('Failed: Did not receive final ACK from client after sending FIN')
@@ -243,7 +242,7 @@ def handle_client_request(client_socket, address):
                                 break
                             # Timeout and no packet sent that met criteria
                             except socket.timeout:
-                                print(f"Timed out waiting for ACK for packet number")
+                                print(f"Timed out waiting for ACK")
 
                     unique_packets = find_duplicates_and_unique(packet_with_sequence)
                     result_dict = list_to_dict(unique_packets)
@@ -283,7 +282,6 @@ def perform_three_way_handshake(server_socket):
             print("Failed: Received invalid response from Client")
             return False, None
     except Exception as e:
-        print(f"Failed: Error during 3-way handshake - {e}")
         return False, None
 
 
@@ -297,20 +295,23 @@ def main():
     server_socket.bind((PROXY_IP, PROXY_PORT))
     signal.signal(signal.SIGINT, signal_handler)
 
-    # Server loop
-    while running:
+    try:
         print("Server is listening for incoming connections...")
-        try:
-            handshake_success, client_addr = perform_three_way_handshake(server_socket)
-            if handshake_success:
-                print(f"Connection established with client {client_addr}")
-                clients.add(client_addr)
-                print(f'Client {client_addr} added to verified client list')
-                handle_client_request(server_socket, client_addr)
-                print("Connection with client ended.")
-        except socket.error as e:
-            print(e)
-            running = False
+        # Server loop
+        while running:
+            try:
+                handshake_success, client_addr = perform_three_way_handshake(server_socket)
+                if handshake_success:
+                    print(f"Connection established with client {client_addr}")
+                    clients.add(client_addr)
+                    print(f'Client {client_addr} added to verified client list')
+                    handle_client_request(server_socket, client_addr)
+                    print("Connection with client ended.")
+            except socket.error as e:
+                print(e)
+                running = False
+    finally:
+        server_socket.close()
 
 
 if __name__ == '__main__':

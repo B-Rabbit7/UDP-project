@@ -16,8 +16,8 @@ SERVER_IP = "127.0.0.1"
 SERVER_PORT = 8889
 
 # Probability of dropping packets from client and server
-DROP_CLIENT_PACKET_PROBABILITY = 1
-DROP_SERVER_PACKET_PROBABILITY = 1
+DROP_CLIENT_PACKET_PROBABILITY = 0.1
+DROP_SERVER_PACKET_PROBABILITY = 0.2
 
 # Probability of delaying packets from client and server
 DELAY_CLIENT_PACKET_PROBABILITY = 0.2
@@ -141,6 +141,8 @@ def send_packet(socket, packet, address):
 
 
 def is_handshake_packet(data):
+    if DROP_CLIENT_PACKET_PROBABILITY == 1 or DROP_SERVER_PACKET_PROBABILITY == 1:
+        return False
     return (data.startswith(b"SYN") or data.startswith(b"SHAKE_ACK") or data.startswith(b"SYN-ACK") or data.startswith(
         b"FIN") or data.startswith(b"FIN-ACK") or data.startswith(b"PSH") or data.startswith(b"PSH-ACK") or
             data.startswith(b"COUNT_ACK") or data.startswith(b"RESULT"))

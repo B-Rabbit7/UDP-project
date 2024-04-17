@@ -135,12 +135,17 @@ def send_file_data(client_socket, udp_ip, udp_port, file_descriptor, packet_coun
                     print(f"Received ACK for {packet_number}")
                     break
 
+                elif ack_signal.startswith("RESULT"):
+                    return
+
                 # If server sends int
                 elif int(ack_signal) in packets_sent.keys():
                     print(f"Server requested packet number: {int(ack_signal)}")
                     packet_with_number = f"{int(ack_signal)}:{packets_sent[int(ack_signal)]}"
                     client_socket.sendto(packet_with_number.encode(), (udp_ip, udp_port))
                     print(f"Resent packet {int(ack_signal)}")
+
+
 
             except socket.timeout:
                 client_socket.sendto(packet_with_number.encode(), (udp_ip, udp_port))
